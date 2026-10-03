@@ -1,7 +1,7 @@
 package com.example.frem.data.repository
 
-import com.example.frem.SongDao
-import com.example.frem.SongEntity
+import com.example.frem.models.SongDao
+import com.example.frem.models.SongEntity
 import com.example.frem.data.media.MusicScanner
 import com.example.frem.domain.model.Song
 import kotlinx.coroutines.flow.Flow

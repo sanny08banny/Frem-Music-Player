@@ -1,4 +1,4 @@
-package com.example.frem
+package com.example.frem.models
 
 import androidx.room.Dao
 import androidx.room.Insert

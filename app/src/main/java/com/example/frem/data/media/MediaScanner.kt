@@ -8,8 +8,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
-import com.example.frem.SongDao
-import com.example.frem.SongEntity
+import com.example.frem.models.SongDao
+import com.example.frem.models.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

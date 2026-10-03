@@ -5,6 +5,7 @@ import com.example.frem.data.media.MusicScanner
 import com.example.frem.data.repository.MusicRepository
 
 import android.app.Application
+import com.example.frem.repositoy.PlaylistRepository
 
 
 class FremApplication : Application() {
@@ -17,7 +18,8 @@ class FremApplication : Application() {
 
     lateinit var musicRepository: MusicRepository
         private set
-
+    lateinit var playlistRepository: PlaylistRepository
+        private set
     lateinit var fremPlayer: FremPlayer
         private set
 
@@ -38,7 +40,9 @@ class FremApplication : Application() {
             songDao = database.songDao(),
             musicScanner = musicScanner
         )
-
+        playlistRepository = PlaylistRepository(
+            database.playlistDao()
+        )
         // Media3 / ExoPlayer wrapper
         fremPlayer = FremPlayer(
             context = this
