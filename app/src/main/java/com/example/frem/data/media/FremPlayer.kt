@@ -6,13 +6,14 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.frem.domain.model.PlaybackQueue
+import com.example.frem.domain.model.QueueSourceType
 import com.example.frem.domain.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class FremPlayer(context: Context) {
-
     private val player: ExoPlayer = ExoPlayer.Builder(context)
         .setAudioAttributes(
             AudioAttributes.Builder()
@@ -41,6 +42,9 @@ class FremPlayer(context: Context) {
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
 
+    private val _activeQueue = MutableStateFlow<PlaybackQueue?>(null)
+    val activeQueue: StateFlow<PlaybackQueue?> = _activeQueue.asStateFlow()
+
     private val _shuffleEnabled = MutableStateFlow(false)
     val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
 
@@ -50,37 +54,40 @@ class FremPlayer(context: Context) {
     private var currentIndex = -1
 
     init {
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
+        player.addListener(
+            object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    _isPlaying.value = isPlaying
+                }
+
+                override fun onPlaybackStateChanged(state: Int) {
+                    _playbackState.value = state
+
+                    if (state == Player.STATE_READY)
+                        _duration.value = player.duration.coerceAtLeast(0L)
+
+                    if (state == Player.STATE_ENDED)
+                        _position.value = 0L
+                }
+
+                override fun onMediaItemTransition(
+                    mediaItem: MediaItem?,
+                    reason: Int
+                ) {
+                    updateCurrentSong()
+                    updateActiveQueue()
+                }
+
+                override fun onPositionDiscontinuity(
+                    oldPosition: Player.PositionInfo,
+                    newPosition: Player.PositionInfo,
+                    reason: Int
+                ) {
+                    updateCurrentSong()
+                    updatePosition()
+                }
             }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                _playbackState.value = state
-
-                if (state == Player.STATE_READY)
-                    _duration.value = player.duration.coerceAtLeast(0L)
-
-                if (state == Player.STATE_ENDED)
-                    _position.value = 0L
-            }
-
-            override fun onMediaItemTransition(
-                mediaItem: MediaItem?,
-                reason: Int
-            ) {
-                updateCurrentSong()
-            }
-
-            override fun onPositionDiscontinuity(
-                oldPosition: Player.PositionInfo,
-                newPosition: Player.PositionInfo,
-                reason: Int
-            ) {
-                updateCurrentSong()
-                updatePosition()
-            }
-        })
+        )
     }
 
     fun getPlayer(): Player {
@@ -91,9 +98,14 @@ class FremPlayer(context: Context) {
         return player.isPlaying
     }
 
-    fun setQueue(
+    // QUEUE
+
+    fun createQueue(
+        name: String,
+        sourceType: QueueSourceType,
         songs: List<Song>,
         startIndex: Int = 0,
+        shuffle: Boolean = false,
         autoPlay: Boolean = true
     ) {
         if (songs.isEmpty()) {
@@ -101,19 +113,55 @@ class FremPlayer(context: Context) {
             return
         }
 
-        val safeIndex = startIndex.coerceIn(0, songs.lastIndex)
+        val originalSongs = songs.distinctBy { it.id }
 
-        _queue.value = songs
-        currentIndex = safeIndex
+        if (originalSongs.isEmpty()) {
+            clearQueue()
+            return
+        }
 
-        val mediaItems = songs.map { song ->
+        val safeIndex = startIndex.coerceIn(0, originalSongs.lastIndex)
+
+        val orderedSongs: List<Song>
+
+        if (shuffle) {
+            val selectedSong = originalSongs[safeIndex]
+            val remainingSongs = originalSongs
+                .filterIndexed { index, _ -> index != safeIndex }
+                .shuffled()
+
+            orderedSongs = listOf(selectedSong) + remainingSongs
+        } else {
+            orderedSongs = originalSongs
+        }
+
+        val queueId = buildQueueId(
+            sourceType = sourceType,
+            songs = originalSongs
+        )
+
+        val playbackQueue = PlaybackQueue(
+            id = queueId,
+            name = name,
+            sourceType = sourceType,
+            songs = orderedSongs,
+            currentIndex = if (shuffle) 0 else safeIndex,
+            shuffleEnabled = shuffle
+        )
+
+        _activeQueue.value = playbackQueue
+        _queue.value = orderedSongs
+        _shuffleEnabled.value = shuffle
+        currentIndex = if (shuffle) 0 else safeIndex
+
+        val mediaItems = orderedSongs.map { song ->
             MediaItem.Builder()
                 .setMediaId(song.id.toString())
                 .setUri(song.contentUri)
                 .build()
         }
 
-        player.setMediaItems(mediaItems, safeIndex, 0L)
+        player.setMediaItems(mediaItems, currentIndex, 0L)
         player.prepare()
 
         if (autoPlay)
@@ -121,31 +169,76 @@ class FremPlayer(context: Context) {
 
         updateCurrentSong()
         updatePosition()
+        updateActiveQueue()
+    }
+
+    fun setQueue(
+        songs: List<Song>,
+        startIndex: Int = 0,
+        autoPlay: Boolean = true
+    ) {
+        createQueue(
+            name = "Queue",
+            sourceType = QueueSourceType.CUSTOM,
+            songs = songs,
+            startIndex = startIndex,
+            shuffle = false,
+            autoPlay = autoPlay
+        )
     }
 
     fun play(song: Song) {
-        val existingIndex = _queue.value.indexOfFirst {
-            it.id == song.id
-        }
+        val existingIndex = _queue.value.indexOfFirst { it.id == song.id }
 
         if (existingIndex >= 0) {
             currentIndex = existingIndex
-
             player.seekTo(existingIndex, 0L)
             player.play()
-
             updateCurrentSong()
             updatePosition()
-
+            updateActiveQueue()
             return
         }
 
-        setQueue(
+        createQueue(
+            name = song.title,
+            sourceType = QueueSourceType.CUSTOM,
             songs = listOf(song),
             startIndex = 0,
+            shuffle = false,
             autoPlay = true
         )
     }
+
+    fun playFromQueue(song: Song) {
+        val index = _queue.value.indexOfFirst { it.id == song.id }
+
+        if (index < 0) {
+            play(song)
+            return
+        }
+
+        currentIndex = index
+        player.seekTo(index, 0L)
+        player.play()
+        updateCurrentSong()
+        updatePosition()
+        updateActiveQueue()
+    }
+
+    fun hasQueue(): Boolean {
+        return _queue.value.isNotEmpty()
+    }
+
+    fun getActiveQueue(): PlaybackQueue? {
+        return _activeQueue.value
+    }
+
+    fun getCurrentQueueIndex(): Int {
+        return currentIndex
+    }
+
+    // PLAYBACK
 
     fun play() {
         if (player.mediaItemCount == 0)
@@ -175,29 +268,59 @@ class FremPlayer(context: Context) {
             return
         }
 
-        player.seekToPrevious()
+        if (currentIndex > 0) {
+            currentIndex--
 
-        updateCurrentSong()
-        updatePosition()
+            player.seekTo(currentIndex, 0L)
+            updateCurrentSong()
+            updatePosition()
+            updateActiveQueue()
+        } else if (_repeatMode.value == Player.REPEAT_MODE_ALL) {
+            currentIndex = _queue.value.lastIndex
+
+            player.seekTo(currentIndex, 0L)
+            updateCurrentSong()
+            updatePosition()
+            updateActiveQueue()
+        }
     }
 
     fun next() {
         if (player.mediaItemCount == 0)
             return
 
-        player.seekToNext()
+        if (currentIndex < _queue.value.lastIndex) {
+            currentIndex++
 
-        updateCurrentSong()
-        updatePosition()
+            player.seekTo(currentIndex, 0L)
+            updateCurrentSong()
+            updatePosition()
+            updateActiveQueue()
+
+            if (!player.isPlaying)
+                player.play()
+
+            return
+        }
+
+        if (_repeatMode.value == Player.REPEAT_MODE_ALL) {
+            currentIndex = 0
+
+            player.seekTo(currentIndex, 0L)
+            updateCurrentSong()
+            updatePosition()
+            updateActiveQueue()
+            player.play()
+        }
     }
+
+    // SEEK
 
     fun seekTo(position: Long) {
         if (player.mediaItemCount == 0)
             return
 
-        val safePosition = position.coerceAtLeast(0L)
-
-        player.seekTo(safePosition)
+        player.seekTo(position.coerceAtLeast(0L))
         updatePosition()
     }
 
@@ -207,10 +330,7 @@ class FremPlayer(context: Context) {
 
         val target = player.currentPosition + milliseconds.coerceAtLeast(0L)
 
-        player.seekTo(
-            target.coerceAtMost(getDuration())
-        )
-
+        player.seekTo(target.coerceAtMost(getDuration()))
         updatePosition()
     }
 
@@ -224,22 +344,66 @@ class FremPlayer(context: Context) {
         updatePosition()
     }
 
+    // SHUFFLE
+
     fun setShuffleEnabled(enabled: Boolean) {
+        if (_queue.value.isEmpty()) {
+            _shuffleEnabled.value = enabled
+            return
+        }
+
+        if (_shuffleEnabled.value == enabled)
+            return
+
+        val currentSong = _currentSong.value
+
+        if (currentSong == null) {
+            _shuffleEnabled.value = enabled
+            return
+        }
+
+        val songs = _queue.value
+
+        val reorderedSongs: List<Song>
+
+        if (enabled) {
+            val remaining = songs
+                .filter { it.id != currentSong.id }
+                .shuffled()
+
+            reorderedSongs = listOf(currentSong) + remaining
+            currentIndex = 0
+        } else {
+            reorderedSongs = songs
+
+            currentIndex = reorderedSongs
+                .indexOfFirst { it.id == currentSong.id }
+                .coerceAtLeast(0)
+        }
+
+        _queue.value = reorderedSongs
         _shuffleEnabled.value = enabled
-        player.shuffleModeEnabled = enabled
+
+        rebuildPlayerQueue()
+        updateCurrentSong()
+        updatePosition()
+        updateActiveQueue()
     }
 
     fun toggleShuffle() {
         setShuffleEnabled(!_shuffleEnabled.value)
     }
 
+    // REPEAT
+
     fun setRepeatMode(mode: Int) {
         if (
             mode != Player.REPEAT_MODE_OFF &&
             mode != Player.REPEAT_MODE_ONE &&
             mode != Player.REPEAT_MODE_ALL
-        )
+        ) {
             return
+        }
 
         _repeatMode.value = mode
         player.repeatMode = mode
@@ -255,6 +419,8 @@ class FremPlayer(context: Context) {
 
         setRepeatMode(nextMode)
     }
+
+    // STATE
 
     fun getCurrentSong(): Song? {
         return _currentSong.value
@@ -276,28 +442,38 @@ class FremPlayer(context: Context) {
         _duration.value = getDuration()
     }
 
+    // CLEAR / RELEASE
+
     fun clearQueue() {
+        player.stop()
         player.clearMediaItems()
 
         _queue.value = emptyList()
+        _activeQueue.value = null
         _currentSong.value = null
+
         currentIndex = -1
+
         _position.value = 0L
         _duration.value = 0L
         _isPlaying.value = false
         _playbackState.value = Player.STATE_IDLE
+        _shuffleEnabled.value = false
     }
 
     fun release() {
         player.release()
 
         _queue.value = emptyList()
+        _activeQueue.value = null
         _currentSong.value = null
         _isPlaying.value = false
         _position.value = 0L
         _duration.value = 0L
         _playbackState.value = Player.STATE_IDLE
     }
+
+    // INTERNAL
 
     private fun updateCurrentSong() {
         val index = player.currentMediaItemIndex
@@ -308,5 +484,43 @@ class FremPlayer(context: Context) {
         } else {
             _currentSong.value = null
         }
+    }
+
+    private fun updateActiveQueue() {
+        val existingQueue = _activeQueue.value ?: return
+
+        _activeQueue.value = existingQueue.copy(
+            songs = _queue.value,
+            currentIndex = currentIndex,
+            shuffleEnabled = _shuffleEnabled.value
+        )
+    }
+
+    private fun rebuildPlayerQueue() {
+        val mediaItems = _queue.value.map { song ->
+            MediaItem.Builder()
+                .setMediaId(song.id.toString())
+                .setUri(song.contentUri)
+                .build()
+        }
+
+        if (mediaItems.isEmpty())
+            return
+
+        player.setMediaItems(
+            mediaItems,
+            currentIndex.coerceIn(0, mediaItems.lastIndex),
+            player.currentPosition
+        )
+
+        player.prepare()
+    }
+
+    private fun buildQueueId(
+        sourceType: QueueSourceType,
+        songs: List<Song>
+    ): String {
+        val songIds = songs.joinToString("-") { it.id.toString() }
+        return "${sourceType.name.lowercase()}_$songIds"
     }
 }

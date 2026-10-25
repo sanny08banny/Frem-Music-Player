@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.frem.domain.model.QueueSourceType
 import com.example.frem.navigation.FremBottomNavigation
 import com.example.frem.navigation.FremDestination
 import com.example.frem.presentation.albums.AlbumsScreen
@@ -52,6 +53,14 @@ fun FremRoot() {
         .value
         ?.destination
         ?.route
+
+    val startDestination = remember {
+        if (application.fremPlayer.hasQueue()) {
+            FremDestination.NowPlaying.route
+        } else {
+            FremDestination.Music.route
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -114,12 +123,12 @@ fun FremRoot() {
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = FremDestination.NowPlaying.route,
+                startDestination = startDestination,
                 modifier = Modifier
                     .padding(innerPadding)
                     .safeDrawingPadding()
             ) {
-                // MUSIC
+                // MUSIC / HOME
                 composable(FremDestination.Music.route) {
                     val viewModel: HomeViewModel = viewModel(factory = factory)
 
@@ -142,7 +151,10 @@ fun FremRoot() {
                         },
                         onSongClick = { song ->
                             application.fremPlayer.play(song)
-                            navController.navigate(FremDestination.NowPlaying.route)
+
+                            navController.navigate(FremDestination.NowPlaying.route) {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
@@ -157,7 +169,7 @@ fun FremRoot() {
                             navController.popBackStack()
                         },
                         onQueueClick = {
-                            // Queue screen later.
+                            // Queue screen will be added later.
                         }
                     )
                 }
@@ -173,12 +185,18 @@ fun FremRoot() {
                         },
                         onAlbumClick = { album ->
                             if (album.songs.isNotEmpty()) {
-                                application.fremPlayer.setQueue(
+                                application.fremPlayer.createQueue(
+                                    name = album.title,
+                                    sourceType = QueueSourceType.ALBUM,
                                     songs = album.songs,
                                     startIndex = 0,
+                                    shuffle = false,
                                     autoPlay = true
                                 )
-                                navController.navigate(FremDestination.NowPlaying.route)
+
+                                navController.navigate(FremDestination.NowPlaying.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -195,12 +213,18 @@ fun FremRoot() {
                         },
                         onArtistClick = { artist ->
                             if (artist.songs.isNotEmpty()) {
-                                application.fremPlayer.setQueue(
+                                application.fremPlayer.createQueue(
+                                    name = artist.name,
+                                    sourceType = QueueSourceType.ARTIST,
                                     songs = artist.songs,
                                     startIndex = 0,
+                                    shuffle = false,
                                     autoPlay = true
                                 )
-                                navController.navigate(FremDestination.NowPlaying.route)
+
+                                navController.navigate(FremDestination.NowPlaying.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -232,7 +256,10 @@ fun FremRoot() {
                         },
                         onSongClick = { song ->
                             application.fremPlayer.play(song)
-                            navController.navigate(FremDestination.NowPlaying.route)
+
+                            navController.navigate(FremDestination.NowPlaying.route) {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
