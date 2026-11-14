@@ -3,46 +3,13 @@ package com.example.frem.presentation.nowplaying
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,12 +26,40 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.example.frem.domain.model.Song
 
+private val ScreenBackground = Color(0xFF090B10)
+private val SurfaceColor = Color(0xFF171B23)
+private val PrimaryBlue = Color(0xFF4A9EFF)
+private val PrimaryText = Color(0xFFF5F7FA)
+private val SecondaryText = Color(0xFFB0B7C3)
+private val MutedText = Color(0xFF818A99)
+
+
+private val EmptySong = Song(
+    id = -1L,
+    title = "No song selected",
+    artist = "Choose a song to get started",
+    album = "Your music library",
+    albumArtist = "",
+    duration = 0L,
+    trackNumber = 0,
+    year = 0,
+    genre = "",
+    contentUri = "",
+    path = "",
+    mimeType = "",
+    size = 0L,
+    dateAdded = 0L,
+    dateModified = 0L,
+    albumId = -1L,
+    albumArtworkUri = null,
+    isFavorite = false,
+    playCount = 0,
+    lastPlayed = null,
+    dateAddedToLibrary = 0L
+)
+
 @Composable
-fun NowPlayingScreen(
-    viewModel: NowPlayingViewModel,
-    onBack: () -> Unit,
-    onQueueClick: () -> Unit
-) {
+fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit, onQueueClick: () -> Unit) {
     val song by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val position by viewModel.position.collectAsState()
@@ -72,30 +67,10 @@ fun NowPlayingScreen(
     val shuffle by viewModel.shuffleEnabled.collectAsState()
     val repeat by viewModel.repeatMode.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startPositionUpdates()
-    }
-
-    val currentSong = song
-
-    if (currentSong == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF07090E)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Nothing is playing",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-        return
-    }
+    LaunchedEffect(Unit) { viewModel.startPositionUpdates() }
 
     NowPlayingContent(
-        song = currentSong,
+        song = song ?: EmptySong,
         isPlaying = isPlaying,
         position = position,
         duration = duration,
@@ -129,176 +104,101 @@ private fun NowPlayingContent(
     onShuffle: () -> Unit,
     onRepeat: () -> Unit
 ) {
-    val background = Color(0xFF07090E)
-    val surface = Color(0xFF16191F)
-    val primaryBlue = Color(0xFF2196F3)
-
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isSeeking by remember { mutableStateOf(false) }
 
     LaunchedEffect(position, duration, isSeeking) {
-        if (!isSeeking && duration > 0)
+        if (!isSeeking && duration > 0L) {
             sliderPosition = (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        }
+        if (duration <= 0L && !isSeeking) sliderPosition = 0f
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(background)
+        modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFF141A26), Color(0xFF0D1119), ScreenBackground))
+        )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 24.dp)
+            modifier = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 24.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = PrimaryText, modifier = Modifier.size(26.dp))
                 }
-
                 Text(
-                    text = "Now Playing",
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 4.dp),
-                    color = Color.White,
+                    "Now Playing",
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    color = PrimaryText,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
                 )
-
-                IconButton(
-                    onClick = onQueue,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = "Queue",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
+                IconButton(onClick = onQueue, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = "Queue", tint = SecondaryText, modifier = Modifier.size(26.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(Modifier.height(14.dp))
 
-            AlbumArtwork(
-                artworkUri = song.albumArtworkUri,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-            )
+            AlbumArtwork(song.albumArtworkUri, Modifier.fillMaxWidth().aspectRatio(1f))
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
-                text = song.title.ifBlank { "Unknown title" },
+                song.title.ifBlank { "No song selected" },
                 modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
+                color = PrimaryText,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 2
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(Modifier.height(5.dp))
 
             Text(
-                text = song.artist.ifBlank { "Unknown artist" },
+                song.artist.ifBlank { "Choose a song to get started" },
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFB7B9BE),
+                color = SecondaryText,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(Modifier.height(4.dp))
 
             Text(
-                text = song.album.ifBlank { "Unknown album" },
+                song.album.ifBlank { "Your music library" },
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF858991),
-                style = MaterialTheme.typography.bodyLarge,
+                color = MutedText,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(18.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CircularActionButton(
-                    onClick = {},
-                    background = surface
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
+                CircularActionButton({}, SurfaceColor) {
+                    Icon(Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
-
-                CircularActionButton(
-                    onClick = {},
-                    background = surface
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Song information",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
+                CircularActionButton({}, SurfaceColor) {
+                    Icon(Icons.Default.Info, contentDescription = "Song information", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
-
-                CircularActionButton(
-                    onClick = onQueue,
-                    background = surface
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = "Queue",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
+                CircularActionButton(onQueue, SurfaceColor) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = "Queue", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
-
-                CircularActionButton(
-                    onClick = {},
-                    background = surface
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "More",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
+                CircularActionButton({}, SurfaceColor) {
+                    Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
-
-                CircularActionButton(
-                    onClick = {},
-                    background = surface
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
+                CircularActionButton({}, SurfaceColor) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
             Slider(
                 value = sliderPosition,
@@ -307,108 +207,65 @@ private fun NowPlayingContent(
                     sliderPosition = it
                 },
                 onValueChangeFinished = {
-                    if (duration > 0) {
-                        val newPosition = (sliderPosition * duration)
-                            .toLong()
-                            .coerceIn(0L, duration)
-
-                        isSeeking = false
-                        onSeek(newPosition)
-                    } else {
-                        isSeeking = false
+                    if (duration > 0L) {
+                        onSeek((sliderPosition * duration).toLong().coerceIn(0L, duration))
                     }
+                    isSeeking = false
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = primaryBlue,
-                    inactiveTrackColor = Color(0xFF383C43),
+                    thumbColor = PrimaryText,
+                    activeTrackColor = PrimaryBlue,
+                    inactiveTrackColor = Color(0xFF343B48),
                     activeTickColor = Color.Transparent,
                     inactiveTickColor = Color.Transparent
                 )
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = formatDuration(position),
-                    color = Color(0xFF9A9DA4),
-                    style = MaterialTheme.typography.bodySmall
+                    formatDuration(if (isSeeking && duration > 0L) (sliderPosition * duration).toLong() else position),
+                    color = MutedText,
+                    style = MaterialTheme.typography.labelMedium
                 )
-
-                Text(
-                    text = formatDuration(duration),
-                    color = Color(0xFF9A9DA4),
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(formatDuration(duration), color = MutedText, style = MaterialTheme.typography.labelMedium)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onShuffle,
-                    modifier = Modifier.size(56.dp)
-                ) {
+                IconButton(onClick = onShuffle, modifier = Modifier.size(56.dp)) {
                     Icon(
-                        imageVector = Icons.Default.GraphicEq,
+                        Icons.Default.GraphicEq,
                         contentDescription = "Shuffle",
-                        tint = if (shuffle) primaryBlue else Color.White,
-                        modifier = Modifier.size(30.dp)
+                        tint = if (shuffle) PrimaryBlue else SecondaryText,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                IconButton(onClick = onPrevious, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", tint = PrimaryText, modifier = Modifier.size(36.dp))
                 }
-
-                PlayPauseButton(
-                    isPlaying = isPlaying,
-                    onClick = onPlayPause,
-                    primaryBlue = primaryBlue
-                )
-
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                PlayPauseButton(isPlaying, onPlayPause, PrimaryBlue)
+                IconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Next", tint = PrimaryText, modifier = Modifier.size(36.dp))
                 }
-
-                IconButton(
-                    onClick = onRepeat,
-                    modifier = Modifier.size(56.dp)
-                ) {
+                IconButton(onClick = onRepeat, modifier = Modifier.size(56.dp)) {
                     Icon(
-                        imageVector = Icons.Default.QueueMusic,
+                        Icons.Default.QueueMusic,
                         contentDescription = when (repeat) {
                             Player.REPEAT_MODE_ONE -> "Repeat one"
                             Player.REPEAT_MODE_ALL -> "Repeat all"
                             else -> "Repeat off"
                         },
-                        tint = if (repeat != Player.REPEAT_MODE_OFF) primaryBlue else Color.White,
-                        modifier = Modifier.size(30.dp)
+                        tint = if (repeat != Player.REPEAT_MODE_OFF) PrimaryBlue else SecondaryText,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -417,87 +274,67 @@ private fun NowPlayingContent(
 }
 
 @Composable
-private fun AlbumArtwork(
-    artworkUri: String?,
-    modifier: Modifier = Modifier
-) {
+private fun AlbumArtwork(artworkUri: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF14171D))
+        modifier = modifier.shadow(
+            elevation = 12.dp,
+            shape = RoundedCornerShape(22.dp),
+            ambientColor = Color.Black.copy(alpha = 0.25f),
+            spotColor = Color.Black.copy(alpha = 0.35f)
+        ).clip(RoundedCornerShape(22.dp)).background(Color(0xFF171D28))
     ) {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(artworkUri)
-                .crossfade(true)
-                .build(),
-            contentDescription = "Album artwork",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            loading = { ArtworkPlaceholder() },
-            error = { ArtworkPlaceholder() }
-        )
+        if (artworkUri.isNullOrBlank()) {
+            ArtworkPlaceholder(Modifier.fillMaxSize())
+        } else {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context).data(artworkUri).crossfade(true).build(),
+                contentDescription = "Album artwork",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                loading = { ArtworkPlaceholder(Modifier.fillMaxSize()) },
+                error = { ArtworkPlaceholder(Modifier.fillMaxSize()) }
+            )
+        }
 
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.25f)
-                        )
-                    )
-                )
+            modifier = Modifier.fillMaxWidth().height(80.dp).align(Alignment.BottomCenter).background(
+                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.12f), Color.Black.copy(alpha = 0.38f)))
+            )
         )
     }
 }
 
 @Composable
-private fun ArtworkPlaceholder() {
+private fun ArtworkPlaceholder(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF151922),
-                        Color(0xFF252B36)
+        modifier = modifier.background(
+            Brush.linearGradient(listOf(Color(0xFF26354A), Color(0xFF1C2637), Color(0xFF111722)))
+        ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.size(144.dp).clip(CircleShape).background(
+                Brush.radialGradient(
+                    listOf(
+                        Color(0xFF526D94).copy(alpha = 0.36f),
+                        Color(0xFF30415B).copy(alpha = 0.18f),
+                        Color.Transparent
                     )
                 )
             ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.MusicNote,
-            contentDescription = "No artwork",
-            tint = Color(0xFF6D7480),
-            modifier = Modifier.size(72.dp)
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.MusicNote, contentDescription = "Default album artwork", tint = Color(0xFFB9CDE8), modifier = Modifier.size(76.dp))
+        }
     }
 }
 
 @Composable
-private fun CircularActionButton(
-    onClick: () -> Unit,
-    background: Color,
-    content: @Composable () -> Unit
-) {
+private fun CircularActionButton(onClick: () -> Unit, background: Color, content: @Composable () -> Unit) {
     Box(
-        modifier = Modifier
-            .size(58.dp)
-            .clip(CircleShape)
-            .background(background)
-            .border(
-                width = 1.dp,
-                color = Color(0xFF353941),
-                shape = CircleShape
-            )
-            .clickable { onClick() },
+        modifier = Modifier.size(54.dp).clip(CircleShape).background(background).border(1.dp, Color(0xFF303744), CircleShape).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         content()
@@ -505,51 +342,33 @@ private fun CircularActionButton(
 }
 
 @Composable
-private fun PlayPauseButton(
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    primaryBlue: Color
-) {
+private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit, primaryBlue: Color) {
     Box(
-        modifier = Modifier
-            .size(82.dp)
-            .shadow(
-                elevation = 14.dp,
-                shape = CircleShape,
-                ambientColor = primaryBlue,
-                spotColor = primaryBlue
-            )
-            .clip(CircleShape)
-            .background(Color(0xFF10141B))
-            .border(
-                width = 3.dp,
-                color = primaryBlue,
-                shape = CircleShape
-            )
-            .clickable { onClick() },
+        modifier = Modifier.size(80.dp).shadow(
+            elevation = 12.dp,
+            shape = CircleShape,
+            ambientColor = primaryBlue.copy(alpha = 0.35f),
+            spotColor = primaryBlue.copy(alpha = 0.30f)
+        ).clip(CircleShape).background(
+            Brush.linearGradient(listOf(Color(0xFF1C2636), Color(0xFF111722)))
+        ).border(2.dp, primaryBlue, CircleShape).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = if (isPlaying) "Pause" else "Play",
-            tint = Color.White,
-            modifier = Modifier.size(if (isPlaying) 42.dp else 46.dp)
+            tint = PrimaryText,
+            modifier = Modifier.size(if (isPlaying) 40.dp else 44.dp)
         )
     }
 }
 
 private fun formatDuration(milliseconds: Long): String {
-    if (milliseconds <= 0L)
-        return "0:00"
-
+    if (milliseconds <= 0L) return "0:00"
     val totalSeconds = milliseconds / 1000L
     val hours = totalSeconds / 3600L
     val minutes = (totalSeconds % 3600L) / 60L
     val seconds = totalSeconds % 60L
-
-    return if (hours > 0L) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%d:%02d".format(minutes, seconds)
-    }
+    return if (hours > 0L) "%d:%02d:%02d".format(hours, minutes, seconds)
+    else "%d:%02d".format(minutes, seconds)
 }

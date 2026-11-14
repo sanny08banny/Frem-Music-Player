@@ -57,7 +57,8 @@ class FremViewModelFactory(
 
         if (modelClass.isAssignableFrom(NowPlayingViewModel::class.java)) {
             return NowPlayingViewModel(
-                application.fremPlayer
+                player = application.fremPlayer,
+                musicRepository = application.musicRepository
             ) as T
         }
 

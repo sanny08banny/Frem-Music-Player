@@ -75,6 +75,7 @@ fun FremRoot() {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(Color.Black)
                         .navigationBarsPadding()
                 ) {
                     FremBottomNavigation(
@@ -124,9 +125,7 @@ fun FremRoot() {
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .safeDrawingPadding()
+                modifier = Modifier.padding(innerPadding)
             ) {
                 // MUSIC / HOME
                 composable(FremDestination.Music.route) {
@@ -155,7 +154,12 @@ fun FremRoot() {
                             navController.navigate(FremDestination.NowPlaying.route) {
                                 launchSingleTop = true
                             }
-                        }
+                        },
+                        onRecentlyPlayedClick = {
+
+                        },
+                        fremPlayer = application.fremPlayer,
+                        onQueueClick = {}
                     )
                 }
 
