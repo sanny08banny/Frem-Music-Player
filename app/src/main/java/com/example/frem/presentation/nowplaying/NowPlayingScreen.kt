@@ -122,22 +122,9 @@ private fun NowPlayingContent(
         Column(
             modifier = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 24.dp)
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = PrimaryText, modifier = Modifier.size(26.dp))
-                }
-                Text(
-                    "Now Playing",
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    color = PrimaryText,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                IconButton(onClick = onQueue, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.QueueMusic, contentDescription = "Queue", tint = SecondaryText, modifier = Modifier.size(26.dp))
-                }
-            }
-
+//            IconButton(onClick = onQueue, modifier = Modifier.size(48.dp)) {
+//                Icon(Icons.Default.QueueMusic, contentDescription = "Queue", tint = SecondaryText, modifier = Modifier.size(26.dp))
+//            }
             Spacer(Modifier.height(14.dp))
 
             AlbumArtwork(song.albumArtworkUri, Modifier.fillMaxWidth().aspectRatio(1f))
@@ -192,6 +179,9 @@ private fun NowPlayingContent(
                 }
                 CircularActionButton({}, SurfaceColor) {
                     Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = SecondaryText, modifier = Modifier.size(24.dp))
+                }
+                CircularActionButton({}, SurfaceColor) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = "Queue", tint = SecondaryText, modifier = Modifier.size(24.dp))
                 }
                 CircularActionButton({}, SurfaceColor) {
                     Icon(Icons.Default.Share, contentDescription = "Share", tint = SecondaryText, modifier = Modifier.size(24.dp))
