@@ -1,9 +1,11 @@
 package com.example.frem.data.media
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -105,6 +107,20 @@ class FremPlayer(context: Context) {
     fun getPlayer(): Player = player
     fun isPlayingNow(): Boolean = player.isPlaying
 
+    private fun startMediaService() {
+        if (released) return
+
+        val intent = Intent(
+            appContext,
+            FremMediaService::class.java
+        )
+
+        ContextCompat.startForegroundService(
+            appContext,
+            intent
+        )
+    }
+
     fun createQueue(
         name: String,
         sourceType: QueueSourceType,
@@ -145,7 +161,13 @@ class FremPlayer(context: Context) {
         player.setMediaItems(orderedSongs.map(::createMediaItem), currentIndex, 0L)
         player.repeatMode = _repeatMode.value
         player.prepare()
-        if (autoPlay) player.play() else player.pause()
+
+        if (autoPlay) {
+            startMediaService()
+            player.play()
+        } else {
+            player.pause()
+        }
         updateCurrentSong()
         updatePosition()
         updateActiveQueue()
@@ -169,12 +191,15 @@ class FremPlayer(context: Context) {
         if (index >= 0) {
             currentIndex = index
             player.seekTo(index, 0L)
+
+            startMediaService()
             player.play()
+
             updateCurrentSong()
             updatePosition()
             updateActiveQueue()
             savePlaybackState()
-        } else {
+        }else {
             createQueue(
                 name = song.title,
                 sourceType = QueueSourceType.CUSTOM,
@@ -194,7 +219,10 @@ class FremPlayer(context: Context) {
         }
         currentIndex = index
         player.seekTo(index, 0L)
+
+        startMediaService()
         player.play()
+
         updateCurrentSong()
         updatePosition()
         updateActiveQueue()
@@ -206,7 +234,10 @@ class FremPlayer(context: Context) {
     fun getCurrentQueueIndex(): Int = currentIndex
 
     fun play() {
-        if (!released && player.mediaItemCount > 0) player.play()
+        if (!released && player.mediaItemCount > 0) {
+            startMediaService()
+            player.play()
+        }
     }
 
     fun pause() {
@@ -442,8 +473,28 @@ class FremPlayer(context: Context) {
         _playbackState.value = Player.STATE_IDLE
     }
 
-    private fun createMediaItem(song: Song): MediaItem =
-        MediaItem.Builder().setMediaId(song.id.toString()).setUri(Uri.parse(song.contentUri)).build()
+
+
+    private fun createMediaItem(song: Song): MediaItem {
+
+        val metadata = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle(song.title)
+            .setArtist(song.artist)
+            .setAlbumTitle(song.album)
+            .apply {
+                song.albumArtworkUri
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { setArtworkUri(Uri.parse(it)) }
+            }
+            .build()
+
+        return MediaItem.Builder()
+            .setMediaId(song.id.toString())
+            .setUri(Uri.parse(song.contentUri))
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
 
     private fun updateCurrentSong() {
         val index = player.currentMediaItemIndex

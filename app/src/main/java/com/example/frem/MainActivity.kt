@@ -1,3 +1,4 @@
+
 package com.example.frem
 
 import android.Manifest
@@ -6,16 +7,16 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.example.frem.utils.PermissionScreen
+import androidx.lifecycle.lifecycleScope
 import com.example.frem.ui.theme.FremTheme
-import kotlinx.coroutines.CoroutineScope
+import com.example.frem.utils.PermissionScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -29,20 +30,26 @@ class MainActivity : ComponentActivity() {
             hasAudioPermission = granted
 
             if (granted) {
+                requestNotificationPermission()
                 scanMusic()
             }
+        }
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) {
+            // Notification permission is optional for music playback.
+            // Continue using the app even if the user denies it.
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-//        enableEdgeToEdge()
-
         hasAudioPermission = checkAudioPermission()
 
         setContent {
             FremTheme {
-
                 if (hasAudioPermission) {
                     FremRoot()
                 } else {
@@ -55,55 +62,60 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (!hasAudioPermission) {
-            requestAudioPermission()
-        } else {
+        if (hasAudioPermission) {
+            requestNotificationPermission()
             scanMusic()
+        } else {
+            requestAudioPermission()
         }
     }
 
     private fun requestAudioPermission() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
-            audioPermissionLauncher.launch(
-                Manifest.permission.READ_MEDIA_AUDIO
-            )
-
+        val permission = if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        ) {
+            Manifest.permission.READ_MEDIA_AUDIO
         } else {
-
-            audioPermissionLauncher.launch(
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
+
+        audioPermissionLauncher.launch(permission)
     }
 
     private fun checkAudioPermission(): Boolean {
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
-            checkSelfPermission(
-                Manifest.permission.READ_MEDIA_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-
+        val permission = if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        ) {
+            Manifest.permission.READ_MEDIA_AUDIO
         } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
 
-            checkSelfPermission(
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
+        return checkSelfPermission(permission) ==
+                PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (
+                checkSelfPermission(
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
         }
     }
 
     private fun scanMusic() {
+        val application = application as FremApplication
 
-        val application =
-            application as FremApplication
-
-        CoroutineScope(
-            Dispatchers.IO
-        ).launch {
-
-            application.musicRepository.scanMusic()
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                application.musicRepository.scanMusic()
+            }
         }
     }
 }

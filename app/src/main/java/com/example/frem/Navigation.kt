@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -54,7 +58,23 @@ fun FremRoot() {
         ?.destination
         ?.route
 
-    val startDestination = remember {
+
+    var playbackRestored by remember {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(application) {
+        application.fremPlayer.restoreSavedQueue { songIds ->
+
+            songIds.mapNotNull { songId ->
+                application.musicRepository.getSongById(songId)
+            }
+        }
+
+        playbackRestored = true
+    }
+
+    val startDestination = remember(playbackRestored) {
         if (application.fremPlayer.hasQueue()) {
             FremDestination.NowPlaying.route
         } else {
@@ -122,190 +142,194 @@ fun FremRoot() {
                 }
             }
         ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = startDestination,
-                modifier = Modifier.padding(innerPadding)
-            ) {
-                // MUSIC / HOME
-                composable(FremDestination.Music.route) {
-                    val viewModel: HomeViewModel = viewModel(factory = factory)
+            if (playbackRestored) {
 
-                    HomeScreen(
-                        viewModel = viewModel,
-                        onSongsClick = {
-                            navController.navigate("songs")
-                        },
-                        onAlbumsClick = {
-                            navController.navigate(FremDestination.Albums.route)
-                        },
-                        onArtistsClick = {
-                            navController.navigate(FremDestination.Artists.route)
-                        },
-                        onFoldersClick = {
-                            navController.navigate("folders")
-                        },
-                        onPlaylistsClick = {
-                            navController.navigate("playlists")
-                        },
-                        onSongClick = { song ->
-                            application.fremPlayer.play(song)
+                NavHost(
+                    navController = navController,
+                    startDestination = startDestination,
+                    modifier = Modifier.padding(innerPadding)
+                )
+                {
+                    // MUSIC / HOME
+                    composable(FremDestination.Music.route) {
+                        val viewModel: HomeViewModel = viewModel(factory = factory)
 
-                            navController.navigate(FremDestination.NowPlaying.route) {
-                                launchSingleTop = true
+                        HomeScreen(
+                            viewModel = viewModel,
+                            onSongsClick = {
+                                navController.navigate("songs")
+                            },
+                            onAlbumsClick = {
+                                navController.navigate(FremDestination.Albums.route)
+                            },
+                            onArtistsClick = {
+                                navController.navigate(FremDestination.Artists.route)
+                            },
+                            onFoldersClick = {
+                                navController.navigate("folders")
+                            },
+                            onPlaylistsClick = {
+                                navController.navigate("playlists")
+                            },
+                            onSongClick = { song ->
+                                application.fremPlayer.play(song)
+
+                                navController.navigate(FremDestination.NowPlaying.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onRecentlyPlayedClick = {
+
+                            },
+                            fremPlayer = application.fremPlayer,
+                            onQueueClick = {}
+                        )
+                    }
+
+                    // NOW PLAYING
+                    composable(FremDestination.NowPlaying.route) {
+                        val viewModel: NowPlayingViewModel = viewModel(factory = factory)
+
+                        NowPlayingScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onQueueClick = {
+                                // Queue screen will be added later.
                             }
-                        },
-                        onRecentlyPlayedClick = {
+                        )
+                    }
 
-                        },
-                        fremPlayer = application.fremPlayer,
-                        onQueueClick = {}
-                    )
-                }
+                    // ALBUMS
+                    composable(FremDestination.Albums.route) {
+                        val viewModel: AlbumsViewModel = viewModel(factory = factory)
 
-                // NOW PLAYING
-                composable(FremDestination.NowPlaying.route) {
-                    val viewModel: NowPlayingViewModel = viewModel(factory = factory)
+                        AlbumsScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onAlbumClick = { album ->
+                                if (album.songs.isNotEmpty()) {
+                                    application.fremPlayer.createQueue(
+                                        name = album.title,
+                                        sourceType = QueueSourceType.ALBUM,
+                                        songs = album.songs,
+                                        startIndex = 0,
+                                        shuffle = false,
+                                        autoPlay = true
+                                    )
 
-                    NowPlayingScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onQueueClick = {
-                            // Queue screen will be added later.
-                        }
-                    )
-                }
+                                    navController.navigate(FremDestination.NowPlaying.route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                        )
+                    }
 
-                // ALBUMS
-                composable(FremDestination.Albums.route) {
-                    val viewModel: AlbumsViewModel = viewModel(factory = factory)
+                    // ARTISTS
+                    composable(FremDestination.Artists.route) {
+                        val viewModel: ArtistsViewModel = viewModel(factory = factory)
 
-                    AlbumsScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onAlbumClick = { album ->
-                            if (album.songs.isNotEmpty()) {
-                                application.fremPlayer.createQueue(
-                                    name = album.title,
-                                    sourceType = QueueSourceType.ALBUM,
-                                    songs = album.songs,
-                                    startIndex = 0,
-                                    shuffle = false,
-                                    autoPlay = true
-                                )
+                        ArtistsScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onArtistClick = { artist ->
+                                if (artist.songs.isNotEmpty()) {
+                                    application.fremPlayer.createQueue(
+                                        name = artist.name,
+                                        sourceType = QueueSourceType.ARTIST,
+                                        songs = artist.songs,
+                                        startIndex = 0,
+                                        shuffle = false,
+                                        autoPlay = true
+                                    )
+
+                                    navController.navigate(FremDestination.NowPlaying.route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    // LIBRARY
+                    composable(FremDestination.Library.route) {
+                        LibraryScreen(
+                            onSongsClick = {
+                                navController.navigate("songs")
+                            },
+                            onFoldersClick = {
+                                navController.navigate("folders")
+                            },
+                            onPlaylistsClick = {
+                                navController.navigate("playlists")
+                            }
+                        )
+                    }
+
+                    // SONGS
+                    composable("songs") {
+                        val viewModel: SongsViewModel = viewModel(factory = factory)
+
+                        SongsScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onSongClick = { song ->
+                                application.fremPlayer.play(song)
 
                                 navController.navigate(FremDestination.NowPlaying.route) {
                                     launchSingleTop = true
                                 }
                             }
-                        }
-                    )
-                }
+                        )
+                    }
 
-                // ARTISTS
-                composable(FremDestination.Artists.route) {
-                    val viewModel: ArtistsViewModel = viewModel(factory = factory)
+                    // FOLDERS
+                    composable("folders") {
+                        val viewModel: FoldersViewModel = viewModel(factory = factory)
 
-                    ArtistsScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onArtistClick = { artist ->
-                            if (artist.songs.isNotEmpty()) {
-                                application.fremPlayer.createQueue(
-                                    name = artist.name,
-                                    sourceType = QueueSourceType.ARTIST,
-                                    songs = artist.songs,
-                                    startIndex = 0,
-                                    shuffle = false,
-                                    autoPlay = true
-                                )
-
-                                navController.navigate(FremDestination.NowPlaying.route) {
-                                    launchSingleTop = true
-                                }
+                        FoldersScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onFolderClick = {
+                                // Folder detail later.
                             }
-                        }
-                    )
-                }
+                        )
+                    }
 
-                // LIBRARY
-                composable(FremDestination.Library.route) {
-                    LibraryScreen(
-                        onSongsClick = {
-                            navController.navigate("songs")
-                        },
-                        onFoldersClick = {
-                            navController.navigate("folders")
-                        },
-                        onPlaylistsClick = {
-                            navController.navigate("playlists")
-                        }
-                    )
-                }
+                    // PLAYLISTS
+                    composable("playlists") {
+                        val viewModel: PlaylistsViewModel = viewModel(factory = factory)
 
-                // SONGS
-                composable("songs") {
-                    val viewModel: SongsViewModel = viewModel(factory = factory)
-
-                    SongsScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onSongClick = { song ->
-                            application.fremPlayer.play(song)
-
-                            navController.navigate(FremDestination.NowPlaying.route) {
-                                launchSingleTop = true
+                        PlaylistsScreen(
+                            viewModel = viewModel,
+                            onBack = {
+                                navController.popBackStack()
+                            },
+                            onPlaylistClick = {
+                                // Playlist detail later.
                             }
-                        }
-                    )
-                }
+                        )
+                    }
 
-                // FOLDERS
-                composable("folders") {
-                    val viewModel: FoldersViewModel = viewModel(factory = factory)
+                    // PROFILE
+                    composable(FremDestination.Profile.route) {
+                        // Profile screen will be built here.
+                    }
 
-                    FoldersScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onFolderClick = {
-                            // Folder detail later.
-                        }
-                    )
-                }
-
-                // PLAYLISTS
-                composable("playlists") {
-                    val viewModel: PlaylistsViewModel = viewModel(factory = factory)
-
-                    PlaylistsScreen(
-                        viewModel = viewModel,
-                        onBack = {
-                            navController.popBackStack()
-                        },
-                        onPlaylistClick = {
-                            // Playlist detail later.
-                        }
-                    )
-                }
-
-                // PROFILE
-                composable(FremDestination.Profile.route) {
-                    // Profile screen will be built here.
-                }
-
-                // SEARCH
-                composable(FremDestination.Search.route) {
-                    // Search screen will be built here.
+                    // SEARCH
+                    composable(FremDestination.Search.route) {
+                        // Search screen will be built here.
+                    }
                 }
             }
         }

@@ -93,15 +93,6 @@ fun ArtistsScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Go back",
-                            tint = Color.White
-                        )
-                    }
-                },
                 actions = {
                     IconButton(
                         onClick = {
